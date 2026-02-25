@@ -10,19 +10,22 @@ class EjercicioController extends Controller
 {
     private function checkAdminOrDev()
     {
-        $user = auth()->user();
-        if (!in_array($user->role, ['admin', 'dev'])) {
-            abort(403, 'No tienes permisos para realizar esta acción.');
+        $user = auth('api')->user();
+
+        if (!$user) {
+            abort(403, 'No autenticado');
+        }
+
+        if (!in_array($user->rol, ['admin', 'dev', 'Dev'])) { 
+            abort(403, 'Rol detectado: "' . $user->rol . '". Necesitas admin o dev.');
         }
     }
 
-    // GET /api/ejercicios
     public function index()
     {
         return Ejercicio::all();
     }
 
-    // POST /api/ejercicios
     public function store(Request $request)
     {
         $this->checkAdminOrDev(); // 🔒 solo admin/dev

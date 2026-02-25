@@ -57,27 +57,23 @@ class AuthController extends Controller
             'password' => 'required|string',
         ]);
 
-        $loginInput = $request->login;
+        $field = filter_var($request->login, FILTER_VALIDATE_EMAIL) ? 'email' : 'usuario';
+        $credentials = [$field => $request->login, 'password' => $request->password];
 
-        // Detectar si es email o usuario
-        $field = filter_var($loginInput, FILTER_VALIDATE_EMAIL)
-                    ? 'email'
-                    : 'usuario';
-
-        $credentials = [
-            $field => $loginInput,
-            'password' => $request->password
-        ];
-
-        if (!$token = Auth::guard('api')->attempt($credentials)) {
-            return response()->json([
-                'error' => 'Credenciales incorrectas'
-            ], 401);
+        if (! $token = Auth::guard('api')->attempt($credentials)) {
+            return response()->json(['error' => 'Credenciales incorrectas'], 401);
         }
 
+        // Usuario autenticado
+        $user = Auth::guard('api')->user();
+
+        // Token con rol
+        $customClaims = ['role' => $user->rol];
+        $tokenWithRole = \Tymon\JWTAuth\Facades\JWTAuth::claims($customClaims)->fromUser($user);
+
         return response()->json([
-            'token' => $token,
-            'user' => Auth::guard('api')->user()
+            'token' => $tokenWithRole,
+            'user' => $user
         ]);
     }
 
