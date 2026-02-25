@@ -11,7 +11,24 @@ class RutinaController extends Controller
     // GET /api/rutinas
     public function index()
     {
-        return Rutina::with('ejercicios')->get();
+        $userId = auth()->id();
+
+        $rutinas = Rutina::with('ejercicios')
+            ->where(function ($query) use ($userId) {
+                $query->where('user_id', $userId)
+                    ->orWhere('es_publica', true)
+                    ->orWhereHas('accesos', function($q) use ($userId) {
+                        $q->where('user_id', $userId);
+                    });
+            })
+            ->get()
+            ->map(function ($rutina) use ($userId) {
+                // Agregamos la propiedad sobre la marcha
+                $rutina->es_mia = ($rutina->user_id === $userId);
+                return $rutina;
+            });
+
+        return $rutinas;
     }
 
     // POST /api/rutinas
@@ -36,36 +53,53 @@ class RutinaController extends Controller
             'es_publica' => $data['es_publica'] ?? false,
         ]);
 
-        // Solo IDs, nada más en la pivote
         $rutina->ejercicios()->sync($data['ejercicios']);
 
+        // sincronizar accesos
+        if (!empty($data['accesos'])) {
+            $rutina->accesos()->sync($data['accesos']);
+        }
         return response()->json($rutina->load('ejercicios'), 201);
     }
 
-    // GET /api/rutinas/{id}
     public function show(Rutina $rutina)
     {
+        $userId = auth()->id();
+
+        // si no es pública, y no soy el dueño, y no tengo acceso
+        if (!$rutina->es_publica && $rutina->user_id !== $userId 
+            && !$rutina->accesos()->where('user_id', $userId)->exists()) {
+            return response()->json(['message' => 'No tienes permiso'], 403);
+        }
+
         $rutina->load('ejercicios');
+        $rutina->es_mia = ($rutina->user_id === auth()->id()); // Inyectar propiedad
         $rutina->promedio_calificacion = $rutina->calificaciones()->avg('puntos');
+
         return response()->json($rutina);
     }
 
     // PUT /api/rutinas/{id}
-    // PUT /api/rutinas/{id}
     public function update(Request $request, Rutina $rutina)
     {
-        // 1. Limpiamos el input ANTES de validar
+        $userId = auth()->id();
+
+        // 🚨 Solo el dueño puede editar
+        if ($rutina->user_id !== $userId) {
+            return response()->json([
+                'message' => 'No tienes permiso para editar esta rutina.'
+            ], 403);
+        }
+
+        // --- resto de la actualización ---
         if ($request->has('ejercicios')) {
             $ejerciciosLimpios = collect($request->input('ejercicios'))->map(function($ej) {
-                // Si es un objeto/array, sacamos solo el ID. Si ya es ID, lo dejamos.
                 return is_array($ej) ? ($ej['id'] ?? null) : $ej;
             })->filter()->values()->toArray();
 
-            // Reemplazamos los ejercicios en el request para que la validación pase
             $request->merge(['ejercicios' => $ejerciciosLimpios]);
         }
 
-        // 2. Ahora sí validamos (ya son IDs puros)
         $data = $request->validate([
             'nombre' => 'sometimes|string',
             'descripcion' => 'nullable|string',
@@ -74,14 +108,18 @@ class RutinaController extends Controller
             'es_publica' => 'boolean',
             'ejercicios' => 'sometimes|array|min:1',
             'ejercicios.*' => 'exists:ejercicios,id', 
+            'accesos' => 'sometimes|array', // si agregaste acceso
+            'accesos.*' => 'exists:users,id',
         ]);
 
-        // 3. Actualizamos rutina
         $rutina->update($request->only(['nombre', 'descripcion', 'dificultad', 'duracion', 'es_publica']));
 
-        // 4. Sincronizamos (sync borra los viejos y pone los nuevos del form)
         if ($request->has('ejercicios')) {
             $rutina->ejercicios()->sync($request->input('ejercicios'));
+        }
+
+        if ($request->has('accesos')) {
+            $rutina->accesos()->sync($request->input('accesos'));
         }
 
         return response()->json($rutina->load('ejercicios'));
@@ -90,6 +128,10 @@ class RutinaController extends Controller
     // DELETE /api/rutinas/{id}
     public function destroy(Rutina $rutina)
     {
+        if ($rutina->user_id !== auth()->id()) {
+            return response()->json(['message' => 'No puedes borrar lo que no es tuyo'], 403);
+        }
+
         $rutina->delete();
         return response()->noContent();
     }

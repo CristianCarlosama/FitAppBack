@@ -25,6 +25,11 @@ class Rutina extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function accesos()
+    {
+        return $this->belongsToMany(User::class, 'rutina_user');
+    }
+
     public function calificaciones() {
         return $this->hasMany(CalificacionRutina::class);
     }
