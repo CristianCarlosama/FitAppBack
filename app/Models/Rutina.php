@@ -18,7 +18,7 @@ class Rutina extends Model
         'user_id'];
 
     public function ejercicios() {
-        return $this->hasMany(Ejercicio::class);
+        return $this->belongsToMany(Ejercicio::class);
     }
 
     public function user() {

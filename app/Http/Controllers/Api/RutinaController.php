@@ -23,10 +23,8 @@ class RutinaController extends Controller
             'dificultad' => 'nullable|in:baja,media,alta',
             'duracion' => 'nullable|integer',
             'es_publica' => 'boolean',
-            'user_id' => 'required|exists:users,id',
             'ejercicios' => 'required|array|min:1',
-            'ejercicios.*.nombre' => 'required|string',
-            'ejercicios.*.clase' => 'required|string',
+            'ejercicios.*' => 'exists:ejercicios,id',
             'ejercicios.*.series' => 'nullable|integer',
             'ejercicios.*.repeticiones' => 'nullable|integer',
             'ejercicios.*.descanso' => 'nullable|integer',
@@ -36,10 +34,17 @@ class RutinaController extends Controller
             'ejercicios.*.foto_3' => 'nullable|url',
         ]);
 
-        $rutina = Rutina::create($data);
+        $rutina = Rutina::create([
+            'user_id' => auth()->id(), // 👈 AQUÍ va el user
+            'nombre' => $data['nombre'],
+            'descripcion' => $data['descripcion'] ?? null,
+            'dificultad' => $data['dificultad'] ?? null,
+            'duracion' => $data['duracion'] ?? null,
+            'es_publica' => $data['es_publica'] ?? false,
+        ]);
 
         foreach ($data['ejercicios'] as $ej) {
-            $rutina->ejercicios()->create($ej);
+            $rutina->ejercicios()->attach($data['ejercicios']);
         }
 
         return response()->json($rutina->load('ejercicios'), 201);
@@ -81,12 +86,11 @@ class RutinaController extends Controller
     public function calificar(Request $request, Rutina $rutina)
     {
         $data = $request->validate([
-            'user_id' => 'required|exists:users,id',
             'puntos' => 'required|integer|min:1|max:5',
         ]);
 
         $rutina->calificaciones()->updateOrCreate(
-            ['user_id' => $data['user_id']],
+            ['user_id' => auth()->id()], // 👈 aquí el usuario autenticado
             ['puntos' => $data['puntos']]
         );
 
