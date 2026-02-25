@@ -8,6 +8,14 @@ use Illuminate\Http\Request;
 
 class EjercicioController extends Controller
 {
+    private function checkAdminOrDev()
+    {
+        $user = auth()->user();
+        if (!in_array($user->role, ['admin', 'dev'])) {
+            abort(403, 'No tienes permisos para realizar esta acción.');
+        }
+    }
+
     // GET /api/ejercicios
     public function index()
     {
@@ -17,6 +25,8 @@ class EjercicioController extends Controller
     // POST /api/ejercicios
     public function store(Request $request)
     {
+        $this->checkAdminOrDev(); // 🔒 solo admin/dev
+
         $data = $request->validate([
             'rutina_id' => 'nullable|exists:rutinas,id',
             'nombre' => 'required|string',
@@ -29,7 +39,6 @@ class EjercicioController extends Controller
             'foto_1' => 'nullable|url',
             'foto_2' => 'nullable|url',
             'foto_3' => 'nullable|url',
-            'editable' => 'sometimes|boolean', // para ejercicios de usuario opcionales
         ]);
 
         $ejercicio = Ejercicio::create($data);
@@ -46,9 +55,7 @@ class EjercicioController extends Controller
     // PUT /api/ejercicios/{id}
     public function update(Request $request, Ejercicio $ejercicio)
     {
-        if (!$ejercicio->editable) {
-            return response()->json(['error' => 'Este ejercicio no puede ser editado'], 403);
-        }
+        $this->checkAdminOrDev(); // 🔒 solo admin/dev
 
         $data = $request->validate([
             'nombre' => 'sometimes|string',
@@ -70,9 +77,7 @@ class EjercicioController extends Controller
     // DELETE /api/ejercicios/{id}
     public function destroy(Ejercicio $ejercicio)
     {
-        if (!$ejercicio->editable) {
-            return response()->json(['error' => 'Este ejercicio no puede ser eliminado'], 403);
-        }
+        $this->checkAdminOrDev(); // 🔒 solo admin/dev
 
         $ejercicio->delete();
         return response()->noContent();

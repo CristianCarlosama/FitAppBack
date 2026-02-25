@@ -21,7 +21,6 @@ class Ejercicio extends Model
         'foto_1',
         'foto_2',
         'foto_3',
-        'editable', 
     ];
 
     public function rutina() {
