@@ -24,18 +24,11 @@ class RutinaController extends Controller
             'duracion' => 'nullable|integer',
             'es_publica' => 'boolean',
             'ejercicios' => 'required|array|min:1',
-            'ejercicios.*' => 'exists:ejercicios,id',
-            'ejercicios.*.series' => 'nullable|integer',
-            'ejercicios.*.repeticiones' => 'nullable|integer',
-            'ejercicios.*.descanso' => 'nullable|integer',
-            'ejercicios.*.video_url' => 'nullable|url',
-            'ejercicios.*.foto_1' => 'nullable|url',
-            'ejercicios.*.foto_2' => 'nullable|url',
-            'ejercicios.*.foto_3' => 'nullable|url',
+            'ejercicios.*' => 'exists:ejercicios,id', // solo IDs
         ]);
 
         $rutina = Rutina::create([
-            'user_id' => auth()->id(), // 👈 AQUÍ va el user
+            'user_id' => auth()->id(),
             'nombre' => $data['nombre'],
             'descripcion' => $data['descripcion'] ?? null,
             'dificultad' => $data['dificultad'] ?? null,
@@ -43,9 +36,8 @@ class RutinaController extends Controller
             'es_publica' => $data['es_publica'] ?? false,
         ]);
 
-        foreach ($data['ejercicios'] as $ej) {
-            $rutina->ejercicios()->attach($data['ejercicios']);
-        }
+        // Solo IDs, nada más en la pivote
+        $rutina->ejercicios()->sync($data['ejercicios']);
 
         return response()->json($rutina->load('ejercicios'), 201);
     }
@@ -54,25 +46,45 @@ class RutinaController extends Controller
     public function show(Rutina $rutina)
     {
         $rutina->load('ejercicios');
-
-        // agregar promedio de calificación
         $rutina->promedio_calificacion = $rutina->calificaciones()->avg('puntos');
         return response()->json($rutina);
     }
 
     // PUT /api/rutinas/{id}
+    // PUT /api/rutinas/{id}
     public function update(Request $request, Rutina $rutina)
     {
+        // 1. Limpiamos el input ANTES de validar
+        if ($request->has('ejercicios')) {
+            $ejerciciosLimpios = collect($request->input('ejercicios'))->map(function($ej) {
+                // Si es un objeto/array, sacamos solo el ID. Si ya es ID, lo dejamos.
+                return is_array($ej) ? ($ej['id'] ?? null) : $ej;
+            })->filter()->values()->toArray();
+
+            // Reemplazamos los ejercicios en el request para que la validación pase
+            $request->merge(['ejercicios' => $ejerciciosLimpios]);
+        }
+
+        // 2. Ahora sí validamos (ya son IDs puros)
         $data = $request->validate([
             'nombre' => 'sometimes|string',
             'descripcion' => 'nullable|string',
             'dificultad' => 'nullable|in:baja,media,alta',
             'duracion' => 'nullable|integer',
             'es_publica' => 'boolean',
+            'ejercicios' => 'sometimes|array|min:1',
+            'ejercicios.*' => 'exists:ejercicios,id', 
         ]);
 
-        $rutina->update($data);
-        return response()->json($rutina);
+        // 3. Actualizamos rutina
+        $rutina->update($request->only(['nombre', 'descripcion', 'dificultad', 'duracion', 'es_publica']));
+
+        // 4. Sincronizamos (sync borra los viejos y pone los nuevos del form)
+        if ($request->has('ejercicios')) {
+            $rutina->ejercicios()->sync($request->input('ejercicios'));
+        }
+
+        return response()->json($rutina->load('ejercicios'));
     }
 
     // DELETE /api/rutinas/{id}
@@ -90,7 +102,7 @@ class RutinaController extends Controller
         ]);
 
         $rutina->calificaciones()->updateOrCreate(
-            ['user_id' => auth()->id()], // 👈 aquí el usuario autenticado
+            ['user_id' => auth()->id()],
             ['puntos' => $data['puntos']]
         );
 
