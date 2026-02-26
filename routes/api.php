@@ -18,14 +18,16 @@ Route::get('ejercicios/{ejercicio}', [EjercicioController::class, 'show']);
 
 Route::get('/musculos', [MusculoController::class, 'index']); 
 
+Route::apiResource('rutinas', RutinaController::class);
+Route::post('rutinas/{rutina}/calificar', [RutinaController::class, 'calificar']);
+
+
 // --- RUTAS PROTEGIDAS ---
 Route::middleware('auth:api')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
     Route::post('/medidas', [MedidaController::class, 'storeOrUpdate']);
-    Route::apiResource('rutinas', RutinaController::class);
-    Route::post('rutinas/{rutina}/calificar', [RutinaController::class, 'calificar']);
 
     // Gestión de ejercicios (Requiere Auth y el controlador checa rol)
     Route::post('ejercicios', [EjercicioController::class, 'store']);
