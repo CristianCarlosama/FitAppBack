@@ -23,6 +23,28 @@ class Ejercicio extends Model
         'foto_3',
     ];
 
+    public function musculos() {
+        return $this->belongsToMany(Musculo::class)
+                    ->withPivot('intensidad', 'es_principal')
+                    ->withTimestamps();
+    }
+
+    protected $appends = ['clase', 'musculos_secundarios'];
+
+    public function getClaseAttribute() {
+        $principal = $this->musculos->where('pivot.es_principal', true)->first();
+        return $principal ? $principal->nombre : 'Sin definir';
+    }
+
+    public function getMusculosSecundariosAttribute() {
+        return $this->musculos->where('pivot.es_principal', false)->map(function($m) {
+            return [
+                'nombre' => $m->nombre,
+                'intensidad' => $m->pivot->intensidad
+            ];
+        })->values();
+    }
+
     public function rutina() {
         return $this->belongsTo(Rutina::class);
     }
