@@ -15,11 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        // User::factory()->create([
+        //     'name' => 'Test User',
+        //     'email' => 'test@example.com',
+        // ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // Aquí es donde debes llamar a tus otros seeders (los que sí te sirven)
+        $this->call([
+            MusculoSeeder::class,
+            // Agrega aquí el de Ejercicios o Rutinas si los tienes aparte
         ]);
     }
 }
