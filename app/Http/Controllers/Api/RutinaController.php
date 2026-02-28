@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 
 class RutinaController extends Controller
 {
-    // GET /api/rutinas
     public function index()
     {
         $userId = auth()->id();
@@ -23,15 +22,12 @@ class RutinaController extends Controller
             })
             ->get()
             ->map(function ($rutina) use ($userId) {
-                // Agregamos la propiedad sobre la marcha
                 $rutina->es_mia = ($rutina->user_id === $userId);
                 return $rutina;
             });
-
         return $rutinas;
     }
 
-    // POST /api/rutinas
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -41,7 +37,12 @@ class RutinaController extends Controller
             'duracion' => 'nullable|integer',
             'es_publica' => 'boolean',
             'ejercicios' => 'required|array|min:1',
-            'ejercicios.*' => 'exists:ejercicios,id', // solo IDs
+            'ejercicios.*.id' => 'required|exists:ejercicios,id', // Validamos el ID dentro del objeto
+            'ejercicios.*.series' => 'nullable|integer',
+            'ejercicios.*.repeticiones' => 'nullable|integer',
+            'ejercicios.*.descanso' => 'nullable|integer',
+            'accesos' => 'sometimes|array',
+            'accesos.*' => 'exists:users,id',
         ]);
 
         $rutina = Rutina::create([
@@ -53,30 +54,21 @@ class RutinaController extends Controller
             'es_publica' => $data['es_publica'] ?? false,
         ]);
 
-        $rutina->ejercicios()->sync($data['ejercicios']);
+        $formatoPivote = [];
+        foreach ($data['ejercicios'] as $ej) {
+            $formatoPivote[$ej['id']] = [
+                'series' => $ej['series'] ?? 0,
+                'repeticiones' => $ej['repeticiones'] ?? 0,
+                'descanso' => $ej['descanso'] ?? 60,
+            ];
+        }
 
-        // sincronizar accesos
+        $rutina->ejercicios()->sync($formatoPivote);
+
         if (!empty($data['accesos'])) {
             $rutina->accesos()->sync($data['accesos']);
         }
         return response()->json($rutina->load('ejercicios'), 201);
-    }
-
-    public function show(Rutina $rutina)
-    {
-        $userId = auth()->id();
-
-        // si no es pública, y no soy el dueño, y no tengo acceso
-        if (!$rutina->es_publica && $rutina->user_id !== $userId 
-            && !$rutina->accesos()->where('user_id', $userId)->exists()) {
-            return response()->json(['message' => 'No tienes permiso'], 403);
-        }
-
-        $rutina->load('ejercicios');
-        $rutina->es_mia = ($rutina->user_id === auth()->id()); // Inyectar propiedad
-        $rutina->promedio_calificacion = $rutina->calificaciones()->avg('puntos');
-
-        return response()->json($rutina);
     }
 
     // PUT /api/rutinas/{id}
@@ -84,22 +76,9 @@ class RutinaController extends Controller
     {
         $userId = auth()->id();
 
-        // 🚨 Solo el dueño puede editar
         if ($rutina->user_id !== $userId) {
-            return response()->json([
-                'message' => 'No tienes permiso para editar esta rutina.'
-            ], 403);
+            return response()->json(['message' => 'No tienes permiso'], 403);
         }
-
-        // --- resto de la actualización ---
-        if ($request->has('ejercicios')) {
-            $ejerciciosLimpios = collect($request->input('ejercicios'))->map(function($ej) {
-                return is_array($ej) ? ($ej['id'] ?? null) : $ej;
-            })->filter()->values()->toArray();
-
-            $request->merge(['ejercicios' => $ejerciciosLimpios]);
-        }
-
         $data = $request->validate([
             'nombre' => 'sometimes|string',
             'descripcion' => 'nullable|string',
@@ -107,47 +86,51 @@ class RutinaController extends Controller
             'duracion' => 'nullable|integer',
             'es_publica' => 'boolean',
             'ejercicios' => 'sometimes|array|min:1',
-            'ejercicios.*' => 'exists:ejercicios,id', 
-            'accesos' => 'sometimes|array', // si agregaste acceso
+            'ejercicios.*.id' => 'required_with:ejercicios|exists:ejercicios,id',
+            'ejercicios.*.series' => 'nullable|integer',
+            'ejercicios.*.repeticiones' => 'nullable|integer',
+            'ejercicios.*.descanso' => 'nullable|integer',
+            'accesos' => 'sometimes|array',
             'accesos.*' => 'exists:users,id',
         ]);
 
         $rutina->update($request->only(['nombre', 'descripcion', 'dificultad', 'duracion', 'es_publica']));
 
         if ($request->has('ejercicios')) {
-            $rutina->ejercicios()->sync($request->input('ejercicios'));
+            $formatoPivote = [];
+            foreach ($data['ejercicios'] as $ej) {
+                $formatoPivote[$ej['id']] = [
+                    'series' => $ej['series'] ?? 0,
+                    'repeticiones' => $ej['repeticiones'] ?? 0,
+                    'descanso' => $ej['descanso'] ?? 60,
+                ];
+            }
+            $rutina->ejercicios()->sync($formatoPivote);
         }
-
         if ($request->has('accesos')) {
-            $rutina->accesos()->sync($request->input('accesos'));
+            $rutina->accesos()->sync($data['accesos']);
         }
-
         return response()->json($rutina->load('ejercicios'));
     }
 
-    // DELETE /api/rutinas/{id}
     public function destroy(Rutina $rutina)
     {
         if ($rutina->user_id !== auth()->id()) {
             return response()->json(['message' => 'No puedes borrar lo que no es tuyo'], 403);
         }
-
         $rutina->delete();
         return response()->noContent();
     }
 
-    // POST /api/rutinas/{id}/calificar
     public function calificar(Request $request, Rutina $rutina)
     {
         $data = $request->validate([
             'puntos' => 'required|integer|min:1|max:5',
         ]);
-
         $rutina->calificaciones()->updateOrCreate(
             ['user_id' => auth()->id()],
             ['puntos' => $data['puntos']]
         );
-
         return response()->json([
             'promedio' => $rutina->calificaciones()->avg('puntos')
         ]);

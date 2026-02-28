@@ -15,6 +15,12 @@ return new class extends Migration
             $table->id();
             $table->foreignId('rutina_id')->constrained()->onDelete('cascade');
             $table->foreignId('ejercicio_id')->constrained()->onDelete('cascade');
+            
+            // CAMPOS CLAVE: Aquí es donde vivirá el 4x12 o 3x10
+            $table->integer('series')->default(0);
+            $table->integer('repeticiones')->default(0);
+            $table->integer('descanso')->default(60); // en segundos
+            
             $table->timestamps();
         });
     }
