@@ -5,11 +5,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\MedidaController;
 use App\Http\Controllers\Api\RutinaController;
 use App\Http\Controllers\Api\EjercicioController;
-use App\Http\Controllers\Api\MusculoController; 
-use Illuminate\Support\Facades\Artisan; // Necesario para el fix
+use App\Http\Controllers\Api\MusculoController;
+use App\Http\Controllers\Api\EntrenamientoController; 
+use Illuminate\Support\Facades\Artisan; 
 
-// --- RUTA DE MANTENIMIENTO (FIX PARA RAILWAY) ---
-// Ejecuta esto una vez en el navegador: fitappback-production.up.railway.app/api/fix-storage
 Route::get('/fix-storage', function () {
     Artisan::call('storage:link');
     return response()->json(['message' => 'Enlace simbólico creado con éxito']);
@@ -34,12 +33,12 @@ Route::middleware('auth:api')->group(function () {
 
     Route::post('/medidas', [MedidaController::class, 'storeOrUpdate']);
 
-    // Gestión de ejercicios
     Route::post('ejercicios', [EjercicioController::class, 'store']);
     
-    // CAMBIO VITAL: Usamos match para que acepte el POST que envía el FormData con el _method PUT
     Route::match(['put', 'post'], 'ejercicios/{ejercicio}', [EjercicioController::class, 'update']);
     
     Route::delete('ejercicios/{ejercicio}', [EjercicioController::class, 'destroy']);
     Route::post('ejercicios/{ejercicio}/calificar', [EjercicioController::class, 'calificar']);
+
+    Route::post('/entrenamientos', [EntrenamientoController::class, 'store']);
 });
