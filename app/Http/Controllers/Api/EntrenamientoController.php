@@ -34,7 +34,7 @@ public function store(Request $request)
                 'rutina_id' => $validated['rutina_id'],
                 'fecha_inicio' => $validated['fecha_inicio'],
                 'fecha_fin' => $validated['fecha_fin'],
-                'notas_sesion' => $validated['notas_sesion'],
+                'notas_sesion' => $validated['notas_sesion'] ?? null,
             ]);
 
             // Crear series
@@ -57,9 +57,6 @@ public function store(Request $request)
         ], 201);
 
     } catch (\Exception $e) {
-        // Esto aparecerá en storage/logs/laravel.log
-        Log::error("ERROR CRÍTICO ENTRENAMIENTO: " . $e->getMessage());
-        
         return response()->json([
             'error' => 'Error de servidor',
             'detalle' => $e->getMessage(),
