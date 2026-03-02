@@ -59,23 +59,26 @@ class EntrenamientoController extends Controller
             ], 500);
         }
     }
-    public function getDetalleCalendario(Request $request, $fecha)
-    {
+
+public function getDetalleCalendario($fecha)
+{
+    try {
         $userId = auth()->id();
 
         $entrenamientos = Entrenamiento::with(['series.ejercicio', 'rutina'])
             ->where('user_id', $userId)
             ->whereDate('fecha_inicio', $fecha)
             ->get()
-            ->map(function ($entrenamiento) {
+            ->map(function ($ent) {
                 return [
-                    'id' => $entrenamiento->id,
-                    'nombre_rutina' => $entrenamiento->rutina->nombre ?? 'Sesión Libre',
-                    'notas' => $entrenamiento->notas_sesion,
-                    'hora' => Carbon::parse($entrenamiento->fecha_inicio)->format('H:i'),
-                    'ejercicios' => $entrenamiento->series->groupBy('ejercicio_id')->map(function ($series) {
+                    'id' => $ent->id,
+                    'nombre_rutina' => $ent->rutina->nombre ?? 'Sesión Libre',
+                    'hora' => Carbon::parse($ent->fecha_inicio)->format('H:i'),
+                    'notas' => $ent->notas_sesion,
+                    'ejercicios' => $ent->series->groupBy('ejercicio_id')->map(function ($series) {
+                        $primera = $series->first();
                         return [
-                            'nombre' => $series->first()->ejercicio->nombre ?? 'Ejercicio',
+                            'nombre' => $primera && $primera->ejercicio ? $primera->ejercicio->nombre : 'Ejercicio',
                             'series' => $series->map(fn($s) => [
                                 'peso' => $s->peso,
                                 'reps' => $s->reps,
@@ -86,17 +89,34 @@ class EntrenamientoController extends Controller
                 ];
             });
 
-        $medidas = MedidaCorporal::where('user_id', $userId)
-            ->whereDate('created_at', $fecha)
-            ->first();
-
         return response()->json([
-            'fecha' => $fecha,
             'data' => [
                 'entrenamientos' => $entrenamientos,
-                'medidas' => $medidas,
-                'fotos' => null // Pendiente futuro
+                'medidas' => null
             ]
         ]);
+
+    } catch (\Exception $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
+    }
+}
+
+    public function getResumenMes($year, $month)
+    {
+        $userId = auth()->id(); 
+
+        if (!$userId) {
+            return response()->json(['error' => 'No autorizado'], 401);
+        }
+
+        $dias = \App\Models\Entrenamiento::where('user_id', $userId)
+            ->whereYear('fecha_inicio', $year)
+            ->whereMonth('fecha_inicio', $month)
+            ->get()
+            ->map(fn($ent) => (int) \Carbon\Carbon::parse($ent->fecha_inicio)->format('d'))
+            ->unique()
+            ->values();
+
+        return response()->json($dias);
     }
 }

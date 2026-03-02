@@ -33,16 +33,17 @@ Route::middleware('auth:api')->group(function () {
 
     Route::post('/medidas', [MedidaController::class, 'storeOrUpdate']);
 
-    Route::post('ejercicios', [EjercicioController::class, 'store']);
-    
     Route::match(['put', 'post'], 'ejercicios/{ejercicio}', [EjercicioController::class, 'update']);
     
+    Route::post('ejercicios', [EjercicioController::class, 'store']);
     Route::delete('ejercicios/{ejercicio}', [EjercicioController::class, 'destroy']);
     Route::post('ejercicios/{ejercicio}/calificar', [EjercicioController::class, 'calificar']);
 
     Route::post('/entrenamientos', [EntrenamientoController::class, 'store']);
 
     Route::get('/calendario/detalle/{fecha}', [EntrenamientoController::class, 'getDetalleCalendario']);
+    Route::get('/calendario/mes/{year}/{month}', [EntrenamientoController::class, 'getResumenMes']);
 
     
+
 });

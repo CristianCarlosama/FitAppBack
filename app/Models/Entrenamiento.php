@@ -41,4 +41,8 @@ class Entrenamiento extends Model
                     ->withPivot('peso', 'reps', 'numero_serie', 'rpe')
                     ->withTimestamps();
     }
+
+    public function rutina() {
+        return $this->belongsTo(\App\Models\Rutina::class, 'rutina_id');
+    }
 }
