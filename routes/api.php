@@ -41,4 +41,8 @@ Route::middleware('auth:api')->group(function () {
     Route::post('ejercicios/{ejercicio}/calificar', [EjercicioController::class, 'calificar']);
 
     Route::post('/entrenamientos', [EntrenamientoController::class, 'store']);
+
+    Route::get('/calendario/detalle/{fecha}', [EntrenamientoController::class, 'getDetalleCalendario']);
+
+    
 });
