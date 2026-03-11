@@ -32,7 +32,7 @@ class EntrenamientoController extends Controller
             $entrenamientoId = DB::transaction(function () use ($validated) {
                 $entrenamiento = Entrenamiento::create([
                     'user_id' => auth()->id(),
-                    'rutina_id' => $validated['rutina_id'],
+                    'rutina_id' => $validated['rutina_id'] ?? null,
                     'fecha_inicio' => $validated['fecha_inicio'],
                     'fecha_fin' => $validated['fecha_fin'],
                     'notas_sesion' => $validated['notas_sesion'] ?? null,
